@@ -1,0 +1,216 @@
+## 패키지 설치 
+install.packages("jsonlite") #json 파일 처리
+install.packages("xml2") #XML 파일 처리
+install.packages("dplyr") 
+install.packages("tidyverse") 
+install.packages("plotly")
+install.packages("wordcloud2")
+install.packages("tidytext")
+
+# 패키지 load
+library("jsonlite")
+library("xml2")
+library("dplyr")
+library("tidyverse")
+library("tidyr")
+library("purrr")
+library("lubridate")
+library("ggplot2")
+library("plotly")
+
+data_2025 <- fromJSON("D:/R_Pfolio_Works/Cyber_threat/source/threat_2025/nvdcve-2.0-2025.json")
+data_2024 <- fromJSON("D:/R_Pfolio_Works/Cyber_threat/source/threat_2024/nvdcve-2.0-2024.json")
+data_2023 <- fromJSON("D:/R_Pfolio_Works/Cyber_threat/source/threat_2023/nvdcve-2.0-2023.json")
+
+# 데이터 구조 확인
+str(data_2025)
+head(data_2025)
+colnames(data_2025)
+
+str(data_2024)
+head(data_2024)
+colnames(data_2024)
+
+str(data_2023)
+head(data_2023)
+colnames(data_2023)
+
+# 데이터 객체 파일로 저장하기
+saveRDS(data_2023, "data_2023.rds")
+saveRDS(data_2024, "data_2024.rds")
+saveRDS(data_2025, "data_2025.rds")
+# 저장한 객체 파일 불러오기
+data_2023 <- readRDS("data_2023.rds")
+data_2024 <- readRDS("data_2024.rds")
+data_2025 <- readRDS("data_2025.rds")
+
+# 데이터 구조 변환 df으로 변환
+df_2025 = as.data.frame(data_2025)
+df_2024 = as.data.frame(data_2024)
+df_2023 = as.data.frame(data_2023)
+
+# 데이터 내용 확인
+colnames(df_2025)
+colnames(df_2024)
+colnames(df_2023)
+
+# 중첩된 데이터 풀기 longer 와 wider 함수
+dfall_2025 <- df_2025 %>%
+  unnest_longer(cve) %>%
+  unnest_wider(cve)
+
+dfall_2024 <- df_2024 %>%
+  unnest_longer(cve) %>%
+  unnest_wider(cve)
+
+dfall_2023 <- df_2023 %>%
+  unnest_longer(cve) %>%
+  unnest_wider(cve)
+
+# 한번 더 중첩된 데이터 풀기
+# 중첩된 데이터 컬럼명 -> metrics 컬럼명 (metricV2, metricv40, metricv31)
+dfall_2025 <- dfall_2025 %>%
+  unnest_longer(metrics) %>%
+  unnest_wider(metrics)
+
+dfall_2024 <- dfall_2024 %>%
+  unnest_longer(metrics) %>%
+  unnest_wider(metrics)
+
+# 2023년도에서 metrics 컬럼먼저 풀기
+dfall_2023 <- dfall_2023 %>%
+  unnest_longer(metrics) %>%
+  unnest_wider(metrics)
+
+# 컬럼별 NA 개수 확인
+colSums(is.na(dfall_2025))
+colSums(is.na(dfall_2024))
+colSums(is.na(dfall_2023))
+
+is.na(dfall_2025)
+is.na(dfall_2024)
+is.na(dfall_2023)
+
+
+#  결측치 처리
+#2025
+# 1. 각 컬럼별 NA 개수 확인
+na_cnt_2025 <- colSums(is.na(dfall_2025))
+# 2. NA가 하나라도 있는 컬럼명 추출
+cols_with_na <- names(na_cnt_2025[na_cnt_2025 > 0])
+# 3. NA 포함 컬럼만 데이터에서 제거
+df_cle_2025 <- dfall_2025 %>% select(-all_of(cols_with_na))
+# 결과 확인
+print(colnames(df_cle_2025))  # NA 포함 컬럼 제거 후 남은 컬럼명 출력
+process_2025 <- c("cveTags", "cvssMetricV40", "cvssMetricV30", "cvssMetricV2")
+
+df_cle_2025 <- df_cle_2025 %>%
+  # 리스트형 컬럼 내 실제 NULL 제거
+  mutate(across(all_of(process_2025), ~ ifelse(is.list(.),
+                                                  map(., ~ discard(.x, is.null)), .))) %>%
+  # 문자열 "NULL", "null"은 NA로 변환
+  mutate(across(all_of(process_2025), ~ ifelse(. %in% c("NULL", "null"), NA, .)))
+# NA 개수 확인
+colSums(is.na(df_cle_2025[process_2025]))
+# 1) cveTags가 리스트형 컬럼이라면 내부 NULL 제거
+df_cle_2025 <- df_cle_2025 %>%
+  mutate(cveTags = map(cveTags, ~ discard(.x, is.null)))
+df_cle_2025 <- df_cle_2025 %>%
+  mutate(cveTags = map(cveTags, ~ map(.x, ~ ifelse(. == "NULL", NA, .))))
+colnames(df_cle_2025)
+
+
+#2024
+# 1. 각 컬럼별 NA 개수 확인
+na_cnt_2024 <- colSums(is.na(dfall_2024))
+# 2. NA가 하나라도 있는 컬럼명 추출
+with_na_2024 <- names(na_cnt_2024[na_cnt_2024 > 0])
+# 3. NA 포함 컬럼만 데이터에서 제거
+df_cle_2024 <- dfall_2024 %>% select(-all_of(with_na_2024))
+
+# 결과 확인
+print(colnames(df_cle_2024))  # NA 포함 컬럼 제거 후 남은 컬럼명 출력
+process_2024 <- c("cveTags", "cvssMetricV40", "cvssMetricV30", "cvssMetricV2")
+df_cle_2024 <- df_cle_2024 %>%
+  # 리스트형 컬럼 내 실제 NULL 제거
+  mutate(across(all_of(process_2024), ~ ifelse(is.list(.),
+                                                  map(., ~ discard(.x, is.null)), .))) %>%
+  # 문자열 "NULL", "null"은 NA로 변환
+  mutate(across(all_of(process_2024), ~ ifelse(. %in% c("NULL", "null"), NA, .)))
+# NA 개수 확인
+colSums(is.na(df_cle_2024[process_2024]))
+# 1) cveTags가 리스트형 컬럼이라면 내부 NULL 제거
+df_cle_2024 <- df_cle_2024 %>%
+  mutate(cveTags = map(cveTags, ~ discard(.x, is.null)))
+df_cle_2024 <- df_cle_2024 %>%
+  mutate(cveTags = map(cveTags, ~ map(.x, ~ ifelse(. == "NULL", NA, .))))
+colnames(df_cle_2024)
+
+
+
+# 2023
+# 1. 각 컬럼별 NA 개수 확인
+na_cnt_2023 <- colSums(is.na(dfall_2023))
+# 2. NA가 하나라도 있는 컬럼명 추출
+with_na_2023 <- names(na_cnt_2023[na_cnt_2023 > 0])
+# 3. NA 포함 컬럼만 데이터에서 제거
+df_cle_2023 <- dfall_2023 %>% select(-all_of(with_na_2023))
+
+# 결과 확인
+print(colnames(df_cle_2023))  # NA 포함 컬럼 제거 후 남은 컬럼명 출력
+process_2023 <- c("cveTags", "cvssMetricV40", "cvssMetricV30", "cvssMetricV2")
+df_cle_2023 <- df_cle_2023 %>%
+  # 리스트형 컬럼 내 실제 NULL 제거
+  mutate(across(all_of(process_2023), ~ ifelse(is.list(.),
+                                                  map(., ~ discard(.x, is.null)), .))) %>%
+  # 문자열 "NULL", "null"은 NA로 변환
+  mutate(across(all_of(process_2023), ~ ifelse(. %in% c("NULL", "null"), NA, .)))
+
+# NA 개수 확인
+colSums(is.na(df_cle_2023[process_2023]))
+# 1) cveTags가 리스트형 컬럼이라면 내부 NULL 제거
+df_cle_2023 <- df_cle_2023 %>%
+  mutate(cveTags = map(cveTags, ~ discard(.x, is.null)))
+df_cle_2023 <- df_cle_2023 %>%
+  mutate(cveTags = map(cveTags, ~ map(.x, ~ ifelse(. == "NULL", NA, .))))
+colnames(df_cle_2023)
+
+unique(df_cle_2025$vulnStatus)
+unique(df_cle_2024$vulnStatus)
+unique(df_cle_2023$vulnStatus)
+
+
+# 1. vulnStatus 빈도 막대그래프
+ggplot(df_cle_2025, aes(x = vulnStatus)) +
+  geom_bar(fill = "red") +
+  labs(title = "취약점 상태 빈도", x = "상태", y = "빈도")
+
+status_2025 <- ggplot(df_cle_2025, aes(x = vulnStatus)) +
+  geom_bar(fill = "red") +
+  labs(title = "취약점 상태 빈도", x = "상태", y = "빈도")
+print(status_2025) 
+ggsave("vulnstatus_2025.png", 
+       plot = status_2025,                       
+       width = 12, height = 8,      
+       dpi = 300)
+
+
+status_2024 <- ggplot(df_cle_2024, aes(x = vulnStatus)) +
+  geom_bar(fill = "orange") +
+  labs(title = "취약점 상태 빈도", x = "상태", y = "빈도")
+print(status_2024)
+ggsave("vulnstatus_2024.png", 
+       plot = status_2024,                       
+       width = 12, height = 8,      
+       dpi = 300)
+
+status_2023 <-ggplot(df_cle_2023, aes(x = vulnStatus)) +
+  geom_bar(fill = "blue") +
+  labs(title = "취약점 상태 빈도", x = "상태", y = "빈도")
+
+ggsave("vulnstatus_2023.png", 
+       plot = status_2023,                       
+       width = 12, height = 8,      
+       dpi = 300)
+
+   
