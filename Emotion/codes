@@ -1,0 +1,78 @@
+install.packages("tm")
+install.packages("wordcloud")
+install.packages("stringr")
+#install.packages("KoNLP") 
+install.packages("stopwords")
+install.packages("extrafont")
+
+library(tm)
+library(wordcloud)
+library(stringr)
+#library(KoNLP)
+library(tidytext)
+library(dplyr)
+library(stopwords)
+library(RColorBrewer)
+library(extrafont)
+
+#파일 불러오기
+text_data <- readLines("D:/R_Pfolio_Works/Emotion_result/src/result.txt")
+#소문자 변환
+text_data <- tolower(text_data)
+#특수문자, 숫자 제거, 한글과 영어 제외 숫자,특수문자, 기호 제거
+text_data <- str_replace_all(text_data, "[^가-힣a-z\\s]", " ")
+#한글도 아니고, 소문자 영어 알파벳도 아니고, 공백 문자도 아닌 모든 문자"를 의미
+# " " 빈공백은 찾아낸 문자를모두 공백 한 칸으로 
+#불필요한 공백 정리
+text_data <- str_squish(text_data)
+
+
+# df으로 변환
+text_df <- data.frame(text = text_data, stringsAsFactors = FALSE)
+text_words <- text_df %>%
+  unnest_tokens(word, text)
+
+# 불용어 제거
+korean_words <- c(
+  "의", "가", "이", "은", "들", "는", "좀", "잘", "걍", "과", "도", "를", "으로", "자", 
+  "에", "와", "한", "하다", "그리고", "하지만", "그", "저", "등", "더", "또한", "또", 
+  "하지만", "그러나", "때문에", "때", "까지", "에서", "부터", "그런데", "그리고", 
+  "요", "수", "듯", "듯이", "만", "없이", "해야", "할", "해", "했", "되는", "된다",
+  "하다가", "해서", "하거나", "하는", "한다", "한다면", "한다는", "한다는", "합니다",
+  "있다", "있습니다", "있습니다", "없다", "없습니다", "있었", "없었", "같은", "그런",
+  "때문", "하여", "한다면", "한다고", "합니다", "라고", "라고", "인", "인", "며", "너무",
+  "받아", "받는", "받고", "그대로", "그대로", "이런", "이렇다", "이게", "그게", "저게",
+  "왜", "어디", "어떻게", "좀", "싶다", "봤다", "봤", "했던", "해서", "하여", "자꾸",
+  "재", "되다", "됩니다", "되었", "됐", "되어", "되어서", "되어야", "되면", "랍니다"
+)
+
+stopwords("english") # 영어 불용어 확인
+english_stopwords <- stopwords::stopwords("en") #영어불용어 리스트 불러오기 
+
+all_words <- c(korean_words, english_stopwords)
+
+#제거
+words_cln <- text_words %>%
+  filter(!word %in% all_words) %>%
+  filter(str_length(word) > 1)
+
+#워드클라우드 시각화
+
+# 단어 빈도 계산
+word_counts <- words_cln %>%
+  count(word, sort = TRUE)
+
+#워드클라우드 시각화
+
+pdf("emotion_word.pdf", width= 7, height = 7)
+wordcloud(
+  words = word_counts$word,       # 워드클라우드에 표시할 단어
+  freq = word_counts$n,        # 단어의 빈도
+  min.freq = 3,                   # 최소 빈도수 (이 값보다 적은 단어는 표시 안 함)
+  max.words = 300,                # 최대 표시할 단어 수 
+  random.order = FALSE,           # FALSE면 빈도 높은 단어가 중앙에 크게 배치되고 크기도 커짐
+  rot.per = 0,                 # 90도로 회전할 단어의 비율 (0.35 = 35%)
+  colors = brewer.pal(10, "Dark2"),# ColorBrewer의 "Dark2" 팔레트에서 8가지 색상 사용
+  scale = c(4, 0.4)               # 단어 크기 범위 (가장 큰 단어 크기, 가장 작은 단어 크기)
+)
+
