@@ -76,3 +76,75 @@ wordcloud(
   scale = c(4, 0.4)               # 단어 크기 범위 (가장 큰 단어 크기, 가장 작은 단어 크기)
 )
 
+
+----
+
+#mecab 패키지 사용
+#nstall.packages("devtools")
+
+library(tm)
+library(wordcloud)
+library(stringr)
+#library(KoNLP)
+library(tidytext)
+library(dplyr)
+library(stopwords)
+library(RColorBrewer)
+library(Rcpp)
+library(RcppMeCab)
+
+txt_data <- readLines("D:/R_Pfolio_Works/Emotion_result/src/result.txt")
+txt_data <- tolower(txt_data)
+txt_data <- str_replace_all(txt_data, "[^가-힣a-z\\s]", " ")
+txt_data <- str_squish(txt_data)
+txt_df <- data.frame(text = txt_data, stringsAsFactors = FALSE)
+
+
+# 한국어& 영어어 불용어
+
+# 형태소 분석
+
+mecab <- RcppMeCab::pos(
+  txt_data,
+  sys_dic = "C:/mecab/mecab-ko-dic"
+)
+
+# 리스트 형태 결과를 데이터프레임으로 변환 및 분리
+analyzed_words_df <- unlist(mecab) %>%
+  tibble(word_pos = .) %>%
+  mutate(
+    word = str_remove(word_pos, "/.*"),        # 품사 제거 후 단어만 추출
+    pos = str_extract(word_pos, "(?<=/).*")
+  )
+
+kor_words <- readLines("D:/R_Pfolio_Works/Emotion_result/src/stopwords-ko.txt", encoding = "UTF-8")
+eng_words <- stopwords::stopwords("en") #영어불용어 리스트 불러오기 
+all_words <- c(kor_words, eng_words)
+
+# 제거된 불용어
+words_cln <- analyzed_words_df %>%
+  filter(pos %in% c("NNG", "NNP")) %>% #명사만 선별
+  filter(!word %in% all_words) %>%
+  filter(str_length(word) > 1)
+
+
+head(words_cln)
+
+#워드클라우드 시각화
+# 단어 빈도 계산
+word_counts <- words_cln %>%
+  count(word, sort = TRUE)
+
+wordcloud(
+  words = word_counts$word,       # 워드클라우드에 표시할 단어
+  freq = word_counts$n,        # 단어의 빈도
+  min.freq = 5,                   # 최소 빈도수 (이 값보다 적은 단어는 표시 안 함)
+  max.words = 120,                # 최대 표시할 단어 수 
+  random.order = FALSE,           # FALSE면 빈도 높은 단어가 중앙에 크게 배치되고 크기도 커짐
+  rot.per = 0,                 # 90도로 회전할 단어의 비율 (0.35 = 35%)
+  colors = brewer.pal(8, "Dark2"),# ColorBrewer의 "Dark2" 팔레트에서 8가지 색상 사용
+  scale = c(5, 0.4)               # 단어 크기 범위 (가장 큰 단어 크기, 가장 작은 단어 크기)
+)
+
+
+
